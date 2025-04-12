@@ -86,7 +86,7 @@ export function useProjectChecklist(projectId: string) {
           formattedSections.push({
             id: 'todo',
             title: 'To Do',
-            items: deserializeItems(data.todo_items)
+            items: deserializeItems(data.todo_items as any[])
           });
         }
         
@@ -94,7 +94,7 @@ export function useProjectChecklist(projectId: string) {
           formattedSections.push({
             id: 'in_progress',
             title: 'In Progress',
-            items: deserializeItems(data.in_progress_items)
+            items: deserializeItems(data.in_progress_items as any[])
           });
         }
         
@@ -102,7 +102,7 @@ export function useProjectChecklist(projectId: string) {
           formattedSections.push({
             id: 'done',
             title: 'Done',
-            items: deserializeItems(data.done_items)
+            items: deserializeItems(data.done_items as any[])
           });
         }
         
