@@ -2,7 +2,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import SubtaskItem from './SubtaskItem';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
 interface SubTask {
   id: string;
@@ -27,7 +27,7 @@ const SubtaskList: React.FC<SubtaskListProps> = ({
   onRemoveSubtask,
   onReorderSubtasks
 }) => {
-  const handleDragEnd = (result: any) => {
+  const handleDragEnd = (result: DropResult) => {
     if (!result.destination || !onReorderSubtasks) return;
     
     const items = Array.from(subtasks);

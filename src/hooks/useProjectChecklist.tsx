@@ -1,173 +1,314 @@
-import { useState, useEffect } from 'react';
+
+import { useState, useEffect, useCallback } from 'react';
+import { ChecklistItem } from '@/types/task';
+import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
-import { Json } from '@/integrations/supabase/types';
-import { ChecklistItem, Comment } from '@/types/task';
+import { toast } from 'sonner';
 
-interface ProjectChecklistData {
-  todoItems: ChecklistItem[];
-  inProgressItems: ChecklistItem[];
-  doneItems: ChecklistItem[];
-}
+export function useProjectChecklist(projectId: string) {
+  const [sections, setSections] = useState<Array<{id: string; title: string; items: ChecklistItem[]}>>([]);
+  const [loading, setLoading] = useState(true);
+  const [newTaskTexts, setNewTaskTexts] = useState<Record<string, string>>({});
+  const [selectedTask, setSelectedTask] = useState<{ sectionId: string; taskId: string } | null>(null);
+  const [isEditSectionOpen, setIsEditSectionOpen] = useState(false);
+  const [editingSectionId, setEditingSectionId] = useState('');
+  const [editedSectionTitle, setEditedSectionTitle] = useState('');
+  const [newSectionTitle, setNewSectionTitle] = useState('');
 
-interface UseProjectChecklistReturn {
-  checklistData: ProjectChecklistData;
-  isLoading: boolean;
-  updateChecklistSection: (
-    section: 'todoItems' | 'inProgressItems' | 'doneItems', 
-    items: ChecklistItem[]
-  ) => Promise<void>;
-}
-
-// Helper function to safely convert Json data to ChecklistItem
-const convertJsonToChecklistItems = (jsonData: Json | null): ChecklistItem[] => {
-  if (!jsonData || !Array.isArray(jsonData)) {
-    return [];
-  }
-  
-  // Map and validate each item, making sure to properly convert comments
-  return jsonData.map(item => {
-    // Ensure the item has the required properties
-    if (typeof item === 'object' && item !== null && 
-        'id' in item && 'text' in item) {
-      
-      // Convert comments from Json to proper Comment objects
-      let comments: Comment[] = [];
-      if (Array.isArray(item.comments)) {
-        comments = item.comments.map((comment: any) => ({
-          id: String(comment.id || `generated-${Date.now()}`),
-          text: String(comment.text || ''),
-          author: String(comment.author || 'Unknown'),
-          createdAt: comment.createdAt ? new Date(comment.createdAt) : new Date(),
-        }));
-      }
-      
-      return {
-        id: String(item.id),
-        text: String(item.text),
-        completed: 'completed' in item ? Boolean(item.completed) : false,
-        comments: comments
-      };
-    }
-    
-    // Return a default item if data is malformed
-    console.warn('Malformed checklist item:', item);
-    return {
-      id: `generated-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-      text: 'Unnamed item',
-      completed: false,
-      comments: []
-    };
-  });
-};
-
-export const useProjectChecklist = (projectId?: string): UseProjectChecklistReturn => {
-  const [isLoading, setIsLoading] = useState(true);
-  const [checklistData, setChecklistData] = useState<ProjectChecklistData>({
-    todoItems: [],
-    inProgressItems: [],
-    doneItems: []
-  });
-
-  useEffect(() => {
+  // Fetch checklist data
+  const fetchChecklist = useCallback(async () => {
     if (!projectId) return;
-    
-    const fetchChecklistData = async () => {
-      try {
-        const { data: checklistData, error } = await supabase
-          .from('project_checklists')
-          .select('*')
-          .eq('project_id', projectId)
-          .maybeSingle();
-        
-        if (!error && checklistData) {
-          // Safely convert the JSON data to ChecklistItem[] using our helper function
-          const todoItems = convertJsonToChecklistItems(checklistData.todo_items);
-          const inProgressItems = convertJsonToChecklistItems(checklistData.in_progress_items);
-          const doneItems = convertJsonToChecklistItems(checklistData.done_items);
-          
-          setChecklistData({
-            todoItems,
-            inProgressItems,
-            doneItems
-          });
-        } else {
-          // Initialize with empty arrays if no data exists
-          setChecklistData({
-            todoItems: [],
-            inProgressItems: [],
-            doneItems: []
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching checklist data:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    fetchChecklistData();
-  }, [projectId]);
 
-  const updateChecklistSection = async (
-    section: 'todoItems' | 'inProgressItems' | 'doneItems',
-    items: ChecklistItem[]
-  ) => {
-    if (!projectId) return;
-    
-    // Update local state
-    setChecklistData(prev => ({
-      ...prev,
-      [section]: items
-    }));
-    
     try {
-      // Prepare data for database update
-      const updateData: Record<string, any> = {};
-      
-      if (section === 'todoItems') {
-        updateData.todo_items = items;
-      } else if (section === 'inProgressItems') {
-        updateData.in_progress_items = items;
-      } else if (section === 'doneItems') {
-        updateData.done_items = items;
-      }
-      
-      // Check if record exists
-      const { data: existingRecord, error: checkError } = await supabase
+      setLoading(true);
+      const { data, error } = await supabase
         .from('project_checklists')
-        .select('id')
+        .select('*')
         .eq('project_id', projectId)
         .maybeSingle();
-      
-      if (checkError) throw checkError;
-      
-      if (existingRecord) {
-        // Update existing record
-        const { error: updateError } = await supabase
-          .from('project_checklists')
-          .update(updateData)
-          .eq('project_id', projectId);
-          
-        if (updateError) throw updateError;
+
+      if (error) throw error;
+
+      if (data) {
+        // Convert database data to our section format
+        const formattedSections = [];
+        
+        if (data.todo_items && Array.isArray(data.todo_items)) {
+          formattedSections.push({
+            id: 'todo',
+            title: 'To Do',
+            items: data.todo_items
+          });
+        }
+        
+        if (data.in_progress_items && Array.isArray(data.in_progress_items)) {
+          formattedSections.push({
+            id: 'in_progress',
+            title: 'In Progress',
+            items: data.in_progress_items
+          });
+        }
+        
+        if (data.done_items && Array.isArray(data.done_items)) {
+          formattedSections.push({
+            id: 'done',
+            title: 'Done',
+            items: data.done_items
+          });
+        }
+        
+        setSections(formattedSections);
       } else {
-        // Create new record
-        const { error: insertError } = await supabase
-          .from('project_checklists')
-          .insert({
-            project_id: projectId,
-            ...updateData
-          } as any);
-          
-        if (insertError) throw insertError;
+        // Create default sections if no checklist exists
+        const defaultSections = [
+          { id: 'todo', title: 'To Do', items: [] },
+          { id: 'in_progress', title: 'In Progress', items: [] },
+          { id: 'done', title: 'Done', items: [] }
+        ];
+        setSections(defaultSections);
+        
+        // Create the checklist in the database
+        await supabase.from('project_checklists').insert({
+          project_id: projectId,
+          todo_items: [],
+          in_progress_items: [],
+          done_items: []
+        });
       }
     } catch (error) {
-      console.error('Error updating checklist:', error);
+      console.error('Error fetching checklist:', error);
+      toast.error('Failed to load checklist');
+    } finally {
+      setLoading(false);
     }
-  };
+  }, [projectId]);
+
+  // Initialize checklist
+  useEffect(() => {
+    fetchChecklist();
+  }, [fetchChecklist]);
+
+  // Save checklist changes to database
+  const saveChecklist = useCallback(async () => {
+    if (!projectId) return;
+
+    try {
+      // Convert sections to database format
+      const todoSection = sections.find(s => s.id === 'todo');
+      const inProgressSection = sections.find(s => s.id === 'in_progress');
+      const doneSection = sections.find(s => s.id === 'done');
+
+      const { error } = await supabase
+        .from('project_checklists')
+        .update({
+          todo_items: todoSection?.items || [],
+          in_progress_items: inProgressSection?.items || [],
+          done_items: doneSection?.items || [],
+          updated_at: new Date().toISOString()
+        })
+        .eq('project_id', projectId);
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error saving checklist:', error);
+      toast.error('Failed to save checklist');
+    }
+  }, [projectId, sections]);
+
+  // Save changes when sections change
+  useEffect(() => {
+    if (!loading && sections.length > 0) {
+      saveChecklist();
+    }
+  }, [sections, loading, saveChecklist]);
+
+  // Add a new task
+  const handleAddTask = useCallback((sectionId: string) => {
+    const taskText = newTaskTexts[sectionId] || '';
+    if (!taskText.trim()) return;
+
+    setSections(prevSections => 
+      prevSections.map(section => {
+        if (section.id === sectionId) {
+          return {
+            ...section,
+            items: [
+              ...section.items,
+              {
+                id: uuidv4(),
+                text: taskText,
+                completed: false,
+                comments: []
+              }
+            ]
+          };
+        }
+        return section;
+      })
+    );
+
+    // Clear the input
+    setNewTaskTexts(prev => ({
+      ...prev,
+      [sectionId]: ''
+    }));
+  }, [newTaskTexts]);
+
+  // Delete a task
+  const handleDeleteTask = useCallback((sectionId: string, taskId: string) => {
+    setSections(prevSections => 
+      prevSections.map(section => {
+        if (section.id === sectionId) {
+          return {
+            ...section,
+            items: section.items.filter(item => item.id !== taskId)
+          };
+        }
+        return section;
+      })
+    );
+  }, []);
+
+  // Toggle task completion
+  const handleToggleTaskCompletion = useCallback((sectionId: string, taskId: string, completed: boolean) => {
+    setSections(prevSections => 
+      prevSections.map(section => {
+        if (section.id === sectionId) {
+          return {
+            ...section,
+            items: section.items.map(item => 
+              item.id === taskId ? { ...item, completed } : item
+            )
+          };
+        }
+        return section;
+      })
+    );
+  }, []);
+
+  // Update task text
+  const handleUpdateTaskText = useCallback((sectionId: string, taskId: string, text: string) => {
+    setSections(prevSections => 
+      prevSections.map(section => {
+        if (section.id === sectionId) {
+          return {
+            ...section,
+            items: section.items.map(item => 
+              item.id === taskId ? { ...item, text } : item
+            )
+          };
+        }
+        return section;
+      })
+    );
+  }, []);
+
+  // Add comment to task
+  const handleAddComment = useCallback((sectionId: string, taskId: string, comment: string) => {
+    if (!comment.trim()) return;
+
+    setSections(prevSections => 
+      prevSections.map(section => {
+        if (section.id === sectionId) {
+          return {
+            ...section,
+            items: section.items.map(item => {
+              if (item.id === taskId) {
+                const comments = item.comments || [];
+                return {
+                  ...item,
+                  comments: [
+                    ...comments,
+                    {
+                      id: uuidv4(),
+                      text: comment,
+                      timestamp: new Date().toISOString()
+                    }
+                  ]
+                };
+              }
+              return item;
+            })
+          };
+        }
+        return section;
+      })
+    );
+  }, []);
+
+  // Open edit section dialog
+  const openEditDialog = useCallback((sectionId: string, currentTitle: string) => {
+    setEditingSectionId(sectionId);
+    setEditedSectionTitle(currentTitle);
+    setIsEditSectionOpen(true);
+  }, []);
+
+  // Edit section title
+  const handleEditSection = useCallback(() => {
+    if (!editedSectionTitle.trim()) return;
+
+    setSections(prevSections => 
+      prevSections.map(section => 
+        section.id === editingSectionId 
+          ? { ...section, title: editedSectionTitle } 
+          : section
+      )
+    );
+
+    setIsEditSectionOpen(false);
+  }, [editedSectionTitle, editingSectionId]);
+
+  // Add new section
+  const handleAddSection = useCallback(() => {
+    if (!newSectionTitle.trim()) return;
+
+    setSections(prevSections => [
+      ...prevSections,
+      {
+        id: uuidv4(),
+        title: newSectionTitle,
+        items: []
+      }
+    ]);
+
+    setNewSectionTitle('');
+  }, [newSectionTitle]);
+
+  // Delete section
+  const handleDeleteSection = useCallback((sectionId: string) => {
+    // Don't allow deletion of default sections
+    if (['todo', 'in_progress', 'done'].includes(sectionId)) {
+      toast.error("Can't delete default sections");
+      return;
+    }
+    
+    setSections(prevSections => 
+      prevSections.filter(section => section.id !== sectionId)
+    );
+  }, []);
 
   return {
-    checklistData,
-    isLoading,
-    updateChecklistSection
+    sections,
+    setSections,
+    loading,
+    newTaskTexts,
+    setNewTaskTexts,
+    selectedTask,
+    setSelectedTask,
+    isEditSectionOpen,
+    setIsEditSectionOpen,
+    editedSectionTitle,
+    setEditedSectionTitle,
+    newSectionTitle,
+    setNewSectionTitle,
+    handleAddTask,
+    handleDeleteTask,
+    handleToggleTaskCompletion,
+    handleUpdateTaskText,
+    handleAddComment,
+    openEditDialog,
+    handleEditSection,
+    handleAddSection,
+    handleDeleteSection
   };
-};
+}

@@ -22,6 +22,8 @@ export function addSection(canvas: fabric.Canvas, title: string, color: string, 
     fill: textColor,
     fontFamily: 'Arial',
     textAlign: 'center',
+    selectable: true,
+    editable: true,
   });
   
   const addButton = new fabric.Textbox('+ Add Task', {
@@ -40,8 +42,11 @@ export function addSection(canvas: fabric.Canvas, title: string, color: string, 
     left: left,
     top: top,
     subTargetCheck: true,
+    selectable: true,
+    hasControls: true,
   });
   
+  // Add custom properties to the group
   group.toObject = (function(toObject) {
     return function() {
       return fabric.util.object.extend(toObject.call(this), {
@@ -55,6 +60,9 @@ export function addSection(canvas: fabric.Canvas, title: string, color: string, 
   group.sectionTitle = title;
   
   canvas.add(group);
+  canvas.setActiveObject(group);
+  canvas.renderAll();
+  
   return group;
 }
 

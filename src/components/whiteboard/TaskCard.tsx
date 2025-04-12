@@ -69,8 +69,14 @@ const TaskCard: React.FC<TaskCardProps> = ({
     ));
   };
   
+  const handleReorderSubtasks = (reorderedSubtasks: SubTask[]) => {
+    setTaskSubtasks(reorderedSubtasks);
+  };
+  
   const handleAddTag = (tag: string) => {
-    setTaskTags([...taskTags, tag]);
+    if (!taskTags.includes(tag)) {
+      setTaskTags([...taskTags, tag]);
+    }
   };
   
   const handleRemoveTag = (tag: string) => {
@@ -121,6 +127,7 @@ const TaskCard: React.FC<TaskCardProps> = ({
           onChangeSubtask={handleSubtaskChange}
           onToggleSubtask={handleSubtaskToggle}
           onRemoveSubtask={handleRemoveSubtask}
+          onReorderSubtasks={handleReorderSubtasks}
         />
         
         <TaskMetadata

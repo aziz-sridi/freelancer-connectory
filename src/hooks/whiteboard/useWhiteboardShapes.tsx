@@ -1,26 +1,21 @@
 
 import { fabric } from 'fabric';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import {
   addShape,
   addStickyNote,
   addTaskCard,
   addText,
   addSection,
-  addLine
+  addLine,
+  createDefaultTaskSections
 } from '@/components/whiteboard/WhiteboardShapes';
 
 export function useWhiteboardShapes(canvas: fabric.Canvas | null = null) {
-  const { toast } = useToast();
-
   // Shape-adding wrappers
   const handleAddShape = (type: 'rect' | 'circle') => {
     if (!canvas) {
-      toast({
-        title: "Canvas not ready",
-        description: "Please wait for the canvas to initialize",
-        variant: "destructive",
-      });
+      toast.error("Canvas not ready. Please wait for the whiteboard to initialize.");
       return;
     }
     
@@ -31,11 +26,7 @@ export function useWhiteboardShapes(canvas: fabric.Canvas | null = null) {
 
   const handleAddStickyNote = () => {
     if (!canvas) {
-      toast({
-        title: "Canvas not ready",
-        description: "Please wait for the canvas to initialize",
-        variant: "destructive",
-      });
+      toast.error("Canvas not ready. Please wait for the whiteboard to initialize.");
       return;
     }
     
@@ -46,11 +37,7 @@ export function useWhiteboardShapes(canvas: fabric.Canvas | null = null) {
 
   const handleAddTaskCard = () => {
     if (!canvas) {
-      toast({
-        title: "Canvas not ready",
-        description: "Please wait for the canvas to initialize",
-        variant: "destructive",
-      });
+      toast.error("Canvas not ready. Please wait for the whiteboard to initialize.");
       return;
     }
     
@@ -61,11 +48,7 @@ export function useWhiteboardShapes(canvas: fabric.Canvas | null = null) {
 
   const handleAddText = () => {
     if (!canvas) {
-      toast({
-        title: "Canvas not ready",
-        description: "Please wait for the canvas to initialize",
-        variant: "destructive",
-      });
+      toast.error("Canvas not ready. Please wait for the whiteboard to initialize.");
       return;
     }
     
@@ -77,11 +60,7 @@ export function useWhiteboardShapes(canvas: fabric.Canvas | null = null) {
   // Create new section
   const handleAddSection = () => {
     if (!canvas) {
-      toast({
-        title: "Canvas not ready",
-        description: "Please wait for the canvas to initialize",
-        variant: "destructive",
-      });
+      toast.error("Canvas not ready. Please wait for the whiteboard to initialize.");
       return;
     }
     
@@ -100,22 +79,30 @@ export function useWhiteboardShapes(canvas: fabric.Canvas | null = null) {
       'New Section', 
       randomColor.color, 
       randomColor.textColor, 
-      100, 
-      100
+      canvas.width! / 2 - 125, 
+      canvas.height! / 2 - 150
     );
     
     canvas.fire('object:added', { target: section });
     canvas.renderAll();
   };
 
+  // Add default task sections
+  const handleAddDefaultSections = () => {
+    if (!canvas) {
+      toast.error("Canvas not ready. Please wait for the whiteboard to initialize.");
+      return;
+    }
+    
+    createDefaultTaskSections(canvas);
+    canvas.fire('object:added');
+    canvas.renderAll();
+  };
+
   // Add a method to handle adding lines and arrows
   const handleAddLine = (isArrow: boolean = false) => {
     if (!canvas) {
-      toast({
-        title: "Canvas not ready",
-        description: "Please wait for the canvas to initialize",
-        variant: "destructive",
-      });
+      toast.error("Canvas not ready. Please wait for the whiteboard to initialize.");
       return;
     }
     
@@ -130,6 +117,7 @@ export function useWhiteboardShapes(canvas: fabric.Canvas | null = null) {
     handleAddTaskCard,
     handleAddText,
     handleAddSection,
+    handleAddDefaultSections,
     handleAddLine
   };
 }

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { DragDropContext, Droppable, DropResult } from 'react-beautiful-dnd';
+import { DragDropContext, Droppable, DropResult } from '@hello-pangea/dnd';
 import Section from '../Section';
 import AddSectionForm from '../AddSectionForm';
 import { ChecklistItem } from '@/types/task';
@@ -43,47 +43,59 @@ const SectionList: React.FC<SectionListProps> = ({
 
     const { source, destination, type } = result;
 
+    // Handle section drag & drop
     if (type === 'SECTION') {
       const reorderedSections = [...sections];
       const [movedSection] = reorderedSections.splice(source.index, 1);
       reorderedSections.splice(destination.index, 0, movedSection);
       onSectionsChange(reorderedSections);
-    } else if (type === 'TASK') {
-      const sourceSectionIndex = sections.findIndex(s => s.id === source.droppableId);
-      const destSectionIndex = sections.findIndex(s => s.id === destination.droppableId);
-      
-      if (sourceSectionIndex === -1 || destSectionIndex === -1) return;
-
-      // Handle same-section movement
-      if (source.droppableId === destination.droppableId) {
-        const sectionCopy = { ...sections[sourceSectionIndex] };
-        const items = [...sectionCopy.items];
-        const [movedItem] = items.splice(source.index, 1);
-        items.splice(destination.index, 0, movedItem);
-
-        const newSections = [...sections];
-        newSections[sourceSectionIndex] = { ...sectionCopy, items };
-        onSectionsChange(newSections);
-      } else {
-        // Handle cross-section movement
-        const sourceSection = { ...sections[sourceSectionIndex] };
-        const destSection = { ...sections[destSectionIndex] };
-        
-        const task = sourceSection.items[source.index];
-        if (!task) return;
-
-        const newSourceItems = [...sourceSection.items];
-        newSourceItems.splice(source.index, 1);
-        
-        const newDestItems = [...destSection.items];
-        newDestItems.splice(destination.index, 0, task);
-
-        const newSections = [...sections];
-        newSections[sourceSectionIndex] = { ...sourceSection, items: newSourceItems };
-        newSections[destSectionIndex] = { ...destSection, items: newDestItems };
-        onSectionsChange(newSections);
-      }
+      return;
     }
+
+    // Handle task drag & drop (both within and between sections)
+    const sourceSectionIndex = sections.findIndex(s => s.id === source.droppableId);
+    const destSectionIndex = sections.findIndex(s => s.id === destination.droppableId);
+    
+    if (sourceSectionIndex === -1 || destSectionIndex === -1) return;
+
+    const newSections = [...sections];
+    
+    // Create copies to avoid mutating state directly
+    const sourceSection = {...sections[sourceSectionIndex]};
+    const destSection = {...sections[destSectionIndex]};
+    
+    const sourceItems = [...sourceSection.items];
+    const destItems = source.droppableId === destination.droppableId 
+      ? sourceItems 
+      : [...destSection.items];
+    
+    // Get the task that's being moved
+    const [movedTask] = sourceItems.splice(source.index, 1);
+    
+    // Insert the task at the destination
+    destItems.splice(destination.index, 0, movedTask);
+    
+    // Update the sections with new items
+    if (source.droppableId === destination.droppableId) {
+      // Same section movement
+      newSections[sourceSectionIndex] = {
+        ...sourceSection,
+        items: destItems
+      };
+    } else {
+      // Cross-section movement
+      newSections[sourceSectionIndex] = {
+        ...sourceSection,
+        items: sourceItems
+      };
+      
+      newSections[destSectionIndex] = {
+        ...destSection,
+        items: destItems
+      };
+    }
+    
+    onSectionsChange(newSections);
   };
 
   return (

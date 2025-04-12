@@ -48,7 +48,7 @@ const InteractiveWhiteboard: React.FC<InteractiveWhiteboardProps> = ({ projectId
     const cleanupFn = initCanvas();
     
     return () => {
-      cleanupFn.then(cleanup => {
+      cleanupFn?.then(cleanup => {
         if (cleanup) cleanup();
       });
     };
@@ -93,14 +93,12 @@ const InteractiveWhiteboard: React.FC<InteractiveWhiteboardProps> = ({ projectId
   };
 
   const handleUndo = () => {
-    // Handled by navigation hook
     if (canvas) {
       setCurrentMode('undo');
     }
   };
 
   const handleRedo = () => {
-    // Handled by navigation hook
     if (canvas) {
       setCurrentMode('redo');
     }
@@ -115,7 +113,7 @@ const InteractiveWhiteboard: React.FC<InteractiveWhiteboardProps> = ({ projectId
   };
 
   return (
-    <div className="flex flex-col w-full h-full bg-gray-50">
+    <div className="flex flex-col w-full h-[600px] bg-gray-50">
       <WhiteboardToolbar 
         activeTool={currentMode}
         whiteboardMode={whiteboardMode}
@@ -136,7 +134,7 @@ const InteractiveWhiteboard: React.FC<InteractiveWhiteboardProps> = ({ projectId
       />
       
       <div className="relative flex-1 m-4 overflow-hidden bg-white rounded-xl shadow-xl">
-        <div className="absolute inset-0 bg-grid-gray-200 [mask-image:linear-gradient(0deg,#fff,transparent)]">
+        <div className="absolute inset-0 bg-grid-gray-200">
           <canvas 
             ref={canvasRef} 
             className="w-full h-full touch-pan"
