@@ -1,9 +1,58 @@
 
 import { useState, useEffect, useCallback } from 'react';
-import { ChecklistItem } from '@/types/task';
+import { ChecklistItem, Comment } from '@/types/task';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+
+// Define a type for the serialized form of ChecklistItem for storage
+type SerializedChecklistItem = {
+  id: string;
+  text: string;
+  comments: {
+    id: string;
+    text: string;
+    author: string;
+    createdAt: string;
+  }[];
+  completed: boolean;
+};
+
+// Helper to convert ChecklistItems to a serializable form
+const serializeItems = (items: ChecklistItem[]): SerializedChecklistItem[] => {
+  return items.map(item => ({
+    id: item.id,
+    text: item.text,
+    comments: item.comments.map(comment => ({
+      id: comment.id,
+      text: comment.text,
+      author: comment.author,
+      createdAt: comment.createdAt instanceof Date 
+        ? comment.createdAt.toISOString() 
+        : comment.createdAt
+    })),
+    completed: item.completed
+  }));
+};
+
+// Helper to deserialize items from storage
+const deserializeItems = (serialized: any[]): ChecklistItem[] => {
+  if (!Array.isArray(serialized)) return [];
+  
+  return serialized.map(item => ({
+    id: item.id || uuidv4(),
+    text: item.text || '',
+    comments: Array.isArray(item.comments) 
+      ? item.comments.map((comment: any) => ({
+          id: comment.id || uuidv4(),
+          text: comment.text || '',
+          author: comment.author || 'Anonymous',
+          createdAt: comment.createdAt || new Date().toISOString()
+        }))
+      : [],
+    completed: Boolean(item.completed)
+  }));
+};
 
 export function useProjectChecklist(projectId: string) {
   const [sections, setSections] = useState<Array<{id: string; title: string; items: ChecklistItem[]}>>([]);
@@ -33,27 +82,27 @@ export function useProjectChecklist(projectId: string) {
         // Convert database data to our section format
         const formattedSections = [];
         
-        if (data.todo_items && Array.isArray(data.todo_items)) {
+        if (data.todo_items) {
           formattedSections.push({
             id: 'todo',
             title: 'To Do',
-            items: data.todo_items
+            items: deserializeItems(data.todo_items)
           });
         }
         
-        if (data.in_progress_items && Array.isArray(data.in_progress_items)) {
+        if (data.in_progress_items) {
           formattedSections.push({
             id: 'in_progress',
             title: 'In Progress',
-            items: data.in_progress_items
+            items: deserializeItems(data.in_progress_items)
           });
         }
         
-        if (data.done_items && Array.isArray(data.done_items)) {
+        if (data.done_items) {
           formattedSections.push({
             id: 'done',
             title: 'Done',
-            items: data.done_items
+            items: deserializeItems(data.done_items)
           });
         }
         
@@ -101,9 +150,9 @@ export function useProjectChecklist(projectId: string) {
       const { error } = await supabase
         .from('project_checklists')
         .update({
-          todo_items: todoSection?.items || [],
-          in_progress_items: inProgressSection?.items || [],
-          done_items: doneSection?.items || [],
+          todo_items: todoSection ? serializeItems(todoSection.items) : [],
+          in_progress_items: inProgressSection ? serializeItems(inProgressSection.items) : [],
+          done_items: doneSection ? serializeItems(doneSection.items) : [],
           updated_at: new Date().toISOString()
         })
         .eq('project_id', projectId);
@@ -214,17 +263,16 @@ export function useProjectChecklist(projectId: string) {
             ...section,
             items: section.items.map(item => {
               if (item.id === taskId) {
-                const comments = item.comments || [];
+                const newComment: Comment = {
+                  id: uuidv4(),
+                  text: comment,
+                  author: 'Current User',
+                  createdAt: new Date().toISOString()
+                };
+                
                 return {
                   ...item,
-                  comments: [
-                    ...comments,
-                    {
-                      id: uuidv4(),
-                      text: comment,
-                      timestamp: new Date().toISOString()
-                    }
-                  ]
+                  comments: [...item.comments, newComment]
                 };
               }
               return item;
