@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
   DialogClose,
 } from '@/components/ui/dialog';
 
@@ -26,11 +27,21 @@ const EditSectionDialog: React.FC<EditSectionDialogProps> = ({
   setEditedSectionTitle,
   handleEditSection
 }) => {
+  const onSubmit = () => {
+    if (editedSectionTitle.trim()) {
+      handleEditSection();
+      setIsOpen(false);
+    }
+  };
+  
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Edit Section</DialogTitle>
+          <DialogDescription>
+            Change the title of this section
+          </DialogDescription>
         </DialogHeader>
         <div className="py-4">
           <Input
@@ -40,7 +51,7 @@ const EditSectionDialog: React.FC<EditSectionDialogProps> = ({
             autoFocus
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                handleEditSection();
+                onSubmit();
               }
             }}
           />
@@ -50,7 +61,7 @@ const EditSectionDialog: React.FC<EditSectionDialogProps> = ({
             <Button variant="outline">Cancel</Button>
           </DialogClose>
           <Button 
-            onClick={handleEditSection}
+            onClick={onSubmit}
             disabled={!editedSectionTitle.trim()}
           >
             Save

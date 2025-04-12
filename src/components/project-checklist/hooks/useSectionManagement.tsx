@@ -36,11 +36,16 @@ export const useSectionManagement = ({
     onSectionsChange(updatedSections);
     setIsEditDialogOpen(false);
     setEditingSectionId(null);
-    setEditedSectionTitle('');
     toast.success('Section updated successfully');
   };
   
   const handleDeleteSection = (sectionId: string) => {
+    // Don't allow deletion of default sections
+    if (['todo', 'in_progress', 'done'].includes(sectionId)) {
+      toast.error("Can't delete default sections");
+      return;
+    }
+    
     const updatedSections = sections.filter(section => section.id !== sectionId);
     onSectionsChange(updatedSections);
     toast.success('Section deleted successfully');

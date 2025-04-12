@@ -4,22 +4,10 @@ import { ChecklistItem, Comment } from '@/types/task';
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
-// Define a type for the serialized form of ChecklistItem for storage
-type SerializedChecklistItem = {
-  id: string;
-  text: string;
-  comments: {
-    id: string;
-    text: string;
-    author: string;
-    createdAt: string;
-  }[];
-  completed: boolean;
-};
+import { Json } from '@/integrations/supabase/types';
 
 // Helper to convert ChecklistItems to a serializable form
-const serializeItems = (items: ChecklistItem[]): SerializedChecklistItem[] => {
+const serializeItems = (items: ChecklistItem[]): any[] => {
   return items.map(item => ({
     id: item.id,
     text: item.text,
@@ -36,7 +24,7 @@ const serializeItems = (items: ChecklistItem[]): SerializedChecklistItem[] => {
 };
 
 // Helper to deserialize items from storage
-const deserializeItems = (serialized: any[]): ChecklistItem[] => {
+const deserializeItems = (serialized: any): ChecklistItem[] => {
   if (!Array.isArray(serialized)) return [];
   
   return serialized.map(item => ({
@@ -86,7 +74,7 @@ export function useProjectChecklist(projectId: string) {
           formattedSections.push({
             id: 'todo',
             title: 'To Do',
-            items: deserializeItems(data.todo_items as any[])
+            items: deserializeItems(data.todo_items)
           });
         }
         
@@ -94,7 +82,7 @@ export function useProjectChecklist(projectId: string) {
           formattedSections.push({
             id: 'in_progress',
             title: 'In Progress',
-            items: deserializeItems(data.in_progress_items as any[])
+            items: deserializeItems(data.in_progress_items)
           });
         }
         
@@ -102,7 +90,7 @@ export function useProjectChecklist(projectId: string) {
           formattedSections.push({
             id: 'done',
             title: 'Done',
-            items: deserializeItems(data.done_items as any[])
+            items: deserializeItems(data.done_items)
           });
         }
         
@@ -293,7 +281,7 @@ export function useProjectChecklist(projectId: string) {
 
   // Edit section title
   const handleEditSection = useCallback(() => {
-    if (!editedSectionTitle.trim()) return;
+    if (!editedSectionTitle.trim() || !editingSectionId) return;
 
     setSections(prevSections => 
       prevSections.map(section => 
@@ -304,23 +292,32 @@ export function useProjectChecklist(projectId: string) {
     );
 
     setIsEditSectionOpen(false);
-  }, [editedSectionTitle, editingSectionId]);
+    setEditingSectionId('');
+    
+    // Force save after edit
+    setTimeout(() => {
+      saveChecklist();
+    }, 100);
+  }, [editedSectionTitle, editingSectionId, saveChecklist]);
 
   // Add new section
   const handleAddSection = useCallback(() => {
     if (!newSectionTitle.trim()) return;
 
-    setSections(prevSections => [
-      ...prevSections,
-      {
-        id: uuidv4(),
-        title: newSectionTitle,
-        items: []
-      }
-    ]);
+    const newSection = {
+      id: uuidv4(),
+      title: newSectionTitle,
+      items: []
+    };
 
+    setSections(prevSections => [...prevSections, newSection]);
     setNewSectionTitle('');
-  }, [newSectionTitle]);
+    
+    // Force save after adding section
+    setTimeout(() => {
+      saveChecklist();
+    }, 100);
+  }, [newSectionTitle, saveChecklist]);
 
   // Delete section
   const handleDeleteSection = useCallback((sectionId: string) => {
@@ -333,7 +330,12 @@ export function useProjectChecklist(projectId: string) {
     setSections(prevSections => 
       prevSections.filter(section => section.id !== sectionId)
     );
-  }, []);
+    
+    // Force save after deleting section
+    setTimeout(() => {
+      saveChecklist();
+    }, 100);
+  }, [saveChecklist]);
 
   return {
     sections,
